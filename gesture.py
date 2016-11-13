@@ -114,7 +114,12 @@ def start_detect_hand(gesture_call_back=None):
     #fire_img = cv2.imread('./fire.png')
     #Decrease frame size
     cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, frameX)
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameY)    
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameY)
+    pink_lower_bound = [160,50,160]
+    pink_upper_bound = [180,255,255]
+    yellow_lower_bound = [25, 100, 120]
+    yellow_upper_bound = [160, 255, 255]
+    
     while(True):
     
         ret, frame = cap.read()
@@ -122,10 +127,6 @@ def start_detect_hand(gesture_call_back=None):
         # skin color [2,50,50], [15,255,255]
         # pink color [160,50,160], [180,255,255]
         # green color [50, 100, 100], [70, 255, 255]
-        pink_lower_bound = [160,50,160]
-        pink_upper_bound = [180,255,255]
-        yellow_lower_bound = [25, 115, 120]
-        yellow_upper_bound = [90, 235, 255]
         
         pink_cnts = get_contour(frame=frame, lower_bound=pink_lower_bound, upper_bound=pink_upper_bound)
         yellow_cnts = get_contour(frame=frame, lower_bound=yellow_lower_bound, upper_bound=yellow_upper_bound)        
@@ -157,34 +158,91 @@ def click():
     gui.click()
     #print 'click'
 
-def double_click():
-    pass
-
 def collision_detect(x1,y1,r1,x2,y2,r2):
     return (x2-x1)**2 + (y1-y2)**2 <= (r1+r2)**2
 
 previous_center = None
-radius_queue = deque()
-slope_queue = deque()
+hit_counter = 0
+hit_flag = False
+scroll_flag = False
+center_two_points = None
+scroll_center = None
+press_down = False
+switch_counter = 0
 
 def gesture_call_back(pink_center, pink_radius, yellow_center, yellow_radius):
-    global previous_center, radius_queue, slope_queue
+    global previous_center, scroll_flag, hit_flag, hit_counter, center_two_points, scroll_center, press_down, switch_counter
+    
     if previous_center is None:
         previous_center = pink_center
     elif pink_center is not None:
         old_x, old_y = previous_center
         x, y = pink_center
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
-
-        #if distance >= 200:
-            #previous_center = center
-            #return
-        move(previous_center, x, y)
+        if scroll_flag:
+            if center_two_points is not None and scroll_center is not None:
+                #dx = scroll_center[0] - center_two_points[0]
+                #if dx >= 200: #if fingers are more than 200 away
+                    #if press_down: #and they have already been pressed
+                        #if switch_counter >= 5: #and it's been longer than 5 loops
+                            #gui.press('tab')
+                            #switch_counter = 0 #press and make counter 0
+                        #else:
+                            #switch_counter += 1
+                    #else: #if it hasn't been pressed
+                        #press_down = True
+                        #gui.keyDown("command")
+                        #gui.press('tab')
+                        #switch_counter += 1 #press and increment counter
+                #else:
+                gui.scroll((scroll_center[1] - center_two_points[1])) 
+                #if (scroll_center[1] - center_two_points[1])/2 > 20:
+                                       
+                #if dx <= -200:
+                    #if press_down:
+                        #if switch_counter >= 5:
+                            #gui.press('tab')
+                            #switch_counter = 0
+                        #else:
+                            #switch_counter += 1
+                    #else:
+                        #press_down = True
+                        #gui.keyDown("command")
+                        #gui.keyDown('shift')
+                        #gui.press('tab')
+                        #switch_counter += 1
+                #else:
+                    #gui.scroll(scroll_center[1] - center_two_points[1])
+                    
+        else:
+            move(previous_center, x, y)
         previous_center = pink_center
         
     if pink_center and pink_radius and yellow_center and yellow_radius:
+        center_two_points = (pink_center[0] + yellow_center[0])/2, (pink_center[1] + yellow_center[1])/2
         if collision_detect(pink_center[0], pink_center[1], pink_radius, yellow_center[0], yellow_center[1], yellow_radius):
-            click()
+            if hit_flag:
+                hit_counter += 1
+            else:
+                hit_flag = True
+                hit_counter = 1
+            if hit_counter > 3:
+                scroll_flag = True
+                if scroll_center is None:
+                    scroll_center = (pink_center[0] + yellow_center[0])/2, (pink_center[1] + yellow_center[1])/2  
+        else:
+            if hit_flag:
+                if hit_counter <= 3:
+                    click()
+            hit_flag = False
+            scroll_flag = False
+            scroll_center = None
+            if press_down:
+                gui.keyUp('command')
+                gui.keyUp('shift')                
+            press_down = False
+            switch_counter = 0
+            
 
 def main():
     start_detect_hand(gesture_call_back=gesture_call_back)
