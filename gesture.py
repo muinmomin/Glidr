@@ -4,12 +4,14 @@ import time
 
 import pyautogui as gui
 import pyautogui.tweens
+gui.FAILSAFE = False
 
 from collections import deque
 from scipy import stats
 # Function to find angle between two vectors
 
-mouseX, mouseY = 0, 0
+screenX, screenY = pyautogui.size()
+frameX, frameY = 1000, 600
 
 def angle(v1,v2):
     dot = np.dot(v1,v2)
@@ -21,7 +23,7 @@ def angle(v1,v2):
 
 # Function to find distance between two points in a list of lists
 def find_distance(A,B): 
-    return np.sqrt(np.power((A[0][0]-B[0][0]),2) + np.power((A[0][1]-B[0][1]),2)) 
+    return np.sqrt(np.power((A[0][0]-B[0][0]),2) + np.power((A[0][1]-B[0][1]),2))
 
 def detect_face(image):
     faceCascade = cv2.CascadeClassifier('./haarcascade_frontalface_default.xml')
@@ -44,13 +46,13 @@ def start_detect_hand(gesture_call_back=None):
     cap = cv2.VideoCapture(0)
     #fire_img = cv2.imread('./fire.png')
     #Decrease frame size
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 1200)
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 800)    
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, frameX)
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameY)    
     while(True):
     
         #Capture frames from the camera
         ret, frame = cap.read()
-        faces = detect_face(image=frame)
+        #faces = detect_face(image=frame)
     
         blur = cv2.blur(frame,(3,3))
     
@@ -58,9 +60,9 @@ def start_detect_hand(gesture_call_back=None):
         hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
     
         #Create a binary image with where white will be skin colors and rest is black
-        mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
-    
-        #Kernel matrices for morphological transformation    
+        #mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
+        mask2 = cv2.inRange(hsv,np.array([160,50,160]),np.array([180,255,255]))
+        #Kernel matrices for morphological transformation
         kernel_square = np.ones((11,11),np.uint8)
         kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
     
@@ -84,30 +86,34 @@ def start_detect_hand(gesture_call_back=None):
         #Draw Contours
         #cv2.drawContours(frame, cnt, -1, (122,122,0), 3)
         #cv2.imshow('temp',median)
-    
+        #k = cv2.waitKey(10) & 0xFF
+        #if k == 27:
+        #    break
+        #else:
+        #    continue
         #Find Max contour area (Assume that hand is in the frame)
         if not len(contours):
             continue
-        max_area=5000
+        max_area=100
         ci=0
         for i in range(len(contours)):
             cnt=contours[i]
             area = cv2.contourArea(cnt)
             if area > max_area:
-                M = cv2.moments(cnt)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                if faces is not None and len(faces):
-                    for (x,y,w,h) in faces:
-                        if x < cX < x + w and y < cY < y + h:
-                            continue
-                        else:
-                            max_area = area
-                            ci = i
-                            break
-                else:
-                    max_area = area
-                    ci = i
+                #M = cv2.moments(cnt)
+                #cX = int(M["m10"] / M["m00"])
+                #cY = int(M["m01"] / M["m00"])
+                #if faces is not None and len(faces):
+                    #for (x,y,w,h) in faces:
+                        #if x < cX < x + w and y < cY < y + h:
+                            #continue
+                        #else:
+                            #max_area = area
+                            #ci = i
+                            #break
+                #else:
+                max_area = area
+                ci = i
             #Largest area contour
         cnts = contours[ci]
         
@@ -196,41 +202,43 @@ def start_detect_hand(gesture_call_back=None):
         cv2.circle(frame,center,radius,(92, 66, 244),5)
         
         #fit line
-        # rows,cols = frame.shape[:2]
-        # [vx,vy,x,y] = cv2.fitLine(cnts, cv2.DIST_LABEL_PIXEL,0,0.01,0.01)
-        # lefty = int((-x*vy/vx) + y)
-        # righty = int(((cols-x)*vy/vx)+y)
-        # cv2.line(frame,(cols-1,righty),(0,lefty),(92, 66, 244),5)     
-        
+        #rows,cols = frame.shape[:2]
+        #[vx,vy,x,y] = cv2.fitLine(cnts, cv2.DIST_LABEL_PIXEL,0,0.01,0.01)
+        #lefty = int((-x*vy/vx) + y)
+        #righty = int(((cols-x)*vy/vx)+y)
+        #cv2.line(frame,(cols-1,righty),(0,lefty),(92, 66, 244),5)     
+        #print righty, lefty
         #add fire
         #fire_img.copyTo(frame, (x,y,fire_img.shape[0], fire_img.shape[1]))
         #x = int(centerMass[0]) - fire_img.shape[0]/2
         #y = int(centerMass[1]) - fire_img.shape[1]/2
         #frame[y:y+fire_img.shape[0], x:x+fire_img.shape[1]] = fire_img
         
-        cv2.imshow('Gesture',frame)
+        #cv2.imshow('Gesture',frame)
         if gesture_call_back:
             gesture_call_back(center=centerMass, contour=cnts)
         #close the output video by pressing 'ESC'
-        k = cv2.waitKey(10) & 0xFF
+        k = cv2.waitKey(5) & 0xFF
         if k == 27:
             break
     
     cap.release()
     cv2.destroyAllWindows()
 
-def move(previous_position, dx,dy):
-    gui.moveRel(-dx, dy, 0.1, pyautogui.tweens.easeInOutQuad)
-    pass
+def move(previous_position, a, b):
+    gui.moveTo((screenX - 1) - ((screenX - 1) * a / (frameX - 1)), (screenY - 1) * b / (frameY - 1), 0.06, pyautogui.easeInOutQuad)
+    #pass
 
 def is_decreased_sequence(sequence):
     for i in xrange(1, len(sequence)):
-        if sequence[i] >= sequence[i-1]:
+        if sequence[i] < sequence[i-1]:
             return False
     return True
 
 def click(x,y):
-    gui.click()
+    #gui.click()
+    pass
+    #print 'click'
 
 def double_click():
     pass
@@ -249,33 +257,28 @@ def gesture_call_back(center, contour):
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
 
         if distance >= 200:
-            previous_center = center
-            return
-        move(previous_center, x - old_x, y - old_y)
+            #previous_center = center
+            #return
+            print 'Scrolling'
+        move(previous_center, x, y)
         previous_center = center
         
         # check click
-        (x,y),radius = cv2.minEnclosingCircle(contour)
-        if len(radius_queue) >= 7:
-            radius_queue.popleft()
-        radius_queue.append(radius)
+        #(x,y),radius = cv2.minEnclosingCircle(contour)
+        #if len(radius_queue) >= 10:
+            #radius_queue.popleft()
+        #radius_queue.append(radius)
         
-        if len(radius_queue) >= 7:
-            slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(radius_queue)),list(radius_queue))
-            if len(slope_queue) >= 6:
-                slope_queue.popleft()
-            slope_queue.append(slope)
-            if len(slope_queue) >= 6 and is_decreased_sequence(list(slope_queue)):
-                slope_queue.clear()
-                click(x,y)
-
-def init_autogui():
-    global mouseX
-    global mouseY
-    mouseX, mouseY = gui.position()
+        #if len(radius_queue) >= 10:
+            #slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(radius_queue)),list(radius_queue))
+            #if len(slope_queue) >= 10:
+                #slope_queue.popleft()
+            #slope_queue.append(slope)
+            #if len(slope_queue) >= 10 and is_decreased_sequence(list(slope_queue)):
+                #slope_queue.clear()
+                #click(x,y)
 
 def main():
-    init_autogui()
     start_detect_hand(gesture_call_back=gesture_call_back)
     
 if __name__ == '__main__':
