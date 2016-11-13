@@ -118,7 +118,7 @@ def start_detect_hand(gesture_call_back=None):
     pink_lower_bound = [160,50,160]
     pink_upper_bound = [180,255,255]
     yellow_lower_bound = [25, 100, 120]
-    yellow_upper_bound = [160, 255, 255]
+    yellow_upper_bound = [155, 255, 255]
     
     while(True):
     
@@ -134,7 +134,7 @@ def start_detect_hand(gesture_call_back=None):
         
         pink_center_mass, pink_radius = augment_graph(frame=frame, contour=pink_cnts)
         yellow_center_mass, yellow_radius = augment_graph(frame=frame, contour=yellow_cnts)
-        cv2.imshow('Gesture',frame)
+        #cv2.imshow('Gesture',frame)
         if gesture_call_back:
             gesture_call_back(pink_center_mass, pink_radius, yellow_center_mass, yellow_radius)
         #close the output video by pressing 'ESC'
@@ -145,7 +145,7 @@ def start_detect_hand(gesture_call_back=None):
     cv2.destroyAllWindows()
 
 def move(previous_position, a, b):
-    gui.moveTo((screenX - 1) - ((screenX - 1) * a / (frameX - 1)), (screenY - 1) * b / (frameY - 1), 0.06, pyautogui.easeInOutQuad)
+    gui.moveTo((screenX - 1) - ((screenX - 1) * a / (frameX - 1)), (screenY - 1) * b / (frameY - 1), 0.02, pyautogui.easeInOutQuad)
     #pass
 
 def is_decreased_sequence(sequence):
@@ -196,7 +196,7 @@ def gesture_call_back(pink_center, pink_radius, yellow_center, yellow_radius):
                         switch_counter += 1 #press and increment counter
                 else:
                     if abs(scroll_center[1] - center_two_points[1]) > 10:
-                        gui.scroll((scroll_center[1] - center_two_points[1])) 
+                        gui.scroll((scroll_center[1] - center_two_points[1]) / 2) 
                 #if (scroll_center[1] - center_two_points[1])/2 > 20:
                                        
                 #if dx <= -200:
