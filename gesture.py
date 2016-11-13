@@ -41,6 +41,73 @@ def intersect(x_1, y_1, width_1, height_1, x_2, y_2, width_2, height_2):
     return not (x_1 > x_2+width_2 or x_1+width_1 < x_2 or y_1 > y_2+height_2 or y_1+height_1 < y_2)
 
 
+def get_contour(frame, lower_bound, upper_bound):
+    blur = cv2.blur(frame,(3,3))
+    #Convert to HSV color space
+    hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
+
+    #Create a binary image with where white will be skin colors and rest is black
+    #mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
+    mask2 = cv2.inRange(hsv,np.array(lower_bound),np.array(upper_bound))
+    #Kernel matrices for morphological transformation
+    kernel_square = np.ones((11,11),np.uint8)
+    kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+
+    #Perform morphological transformations to filter out the background noise
+    #Dilation increase skin color area
+    #Erosion increase skin color area
+    dilation = cv2.dilate(mask2,kernel_ellipse,iterations = 1)
+    erosion = cv2.erode(dilation,kernel_square,iterations = 1)    
+    dilation2 = cv2.dilate(erosion,kernel_ellipse,iterations = 1)    
+    filtered = cv2.medianBlur(dilation2,5)
+    kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(8,8))
+    dilation2 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
+    kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+    dilation3 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
+    median = cv2.medianBlur(dilation2,5)
+    ret,thresh = cv2.threshold(median,127,255,0)
+
+    #Find contours of the filtered frame
+    contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)   
+    #cv2.imshow('Gesture',median)
+    #k = cv2.waitKey(5) & 0xFF
+    #if k == 27:
+        #return None
+    #return None
+    #Draw Contours
+    #Find Max contour area (Assume that hand is in the frame)
+    if not len(contours):
+        return None
+    max_area=100
+    ci=0
+    for i in range(len(contours)):
+        cnt=contours[i]
+        area = cv2.contourArea(cnt)
+        if area > max_area:
+            max_area = area
+            ci = i
+        #Largest area contour
+    cnts = contours[ci]
+    return cnts
+
+def augment_graph(frame, contour):
+    if contour is None:
+        return None, None
+    moments = cv2.moments(contour)
+    #Central mass of first order moments
+    #if moments['m00']!=0:
+    #    cx = int(moments['m10']/moments['m00']) # cx = M10/M00
+    #    cy = int(moments['m01']/moments['m00']) # cy = M01/M00
+    #centerMass = (cx,cy)
+    #Draw center mass
+    #circle
+    (x,y),radius = cv2.minEnclosingCircle(contour)
+    center = (int(x),int(y))
+    radius = int(radius)
+    cv2.circle(frame,center,7,[100,0,255],2)    
+    cv2.circle(frame,center,radius,(92, 66, 244),5)
+    return center, radius
+
 def start_detect_hand(gesture_call_back=None):
     #Open Camera object
     cap = cv2.VideoCapture(0)
@@ -50,178 +117,29 @@ def start_detect_hand(gesture_call_back=None):
     cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameY)    
     while(True):
     
-        #Capture frames from the camera
         ret, frame = cap.read()
-        #faces = detect_face(image=frame)
-    
-        blur = cv2.blur(frame,(3,3))
-    
-        #Convert to HSV color space
-        hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
-    
-        #Create a binary image with where white will be skin colors and rest is black
-        #mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
-        mask2 = cv2.inRange(hsv,np.array([160,50,160]),np.array([180,255,255]))
-        #Kernel matrices for morphological transformation
-        kernel_square = np.ones((11,11),np.uint8)
-        kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
-    
-        #Perform morphological transformations to filter out the background noise
-        #Dilation increase skin color area
-        #Erosion increase skin color area
-        dilation = cv2.dilate(mask2,kernel_ellipse,iterations = 1)
-        erosion = cv2.erode(dilation,kernel_square,iterations = 1)    
-        dilation2 = cv2.dilate(erosion,kernel_ellipse,iterations = 1)    
-        filtered = cv2.medianBlur(dilation2,5)
-        kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(8,8))
-        dilation2 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
-        kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
-        dilation3 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
-        median = cv2.medianBlur(dilation2,5)
-        ret,thresh = cv2.threshold(median,127,255,0)
-    
-        #Find contours of the filtered frame
-        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)   
-    
-        #Draw Contours
-        #cv2.drawContours(frame, cnt, -1, (122,122,0), 3)
-        #cv2.imshow('temp',median)
-        #k = cv2.waitKey(10) & 0xFF
-        #if k == 27:
-        #    break
-        #else:
-        #    continue
-        #Find Max contour area (Assume that hand is in the frame)
-        if not len(contours):
-            continue
-        max_area=100
-        ci=0
-        for i in range(len(contours)):
-            cnt=contours[i]
-            area = cv2.contourArea(cnt)
-            if area > max_area:
-                #M = cv2.moments(cnt)
-                #cX = int(M["m10"] / M["m00"])
-                #cY = int(M["m01"] / M["m00"])
-                #if faces is not None and len(faces):
-                    #for (x,y,w,h) in faces:
-                        #if x < cX < x + w and y < cY < y + h:
-                            #continue
-                        #else:
-                            #max_area = area
-                            #ci = i
-                            #break
-                #else:
-                max_area = area
-                ci = i
-            #Largest area contour
-        cnts = contours[ci]
+        #print frame[frame.shape[0]/2][frame.shape[1]/2]
+        # skin color [2,50,50], [15,255,255]
+        # pink color [160,50,160], [180,255,255]
+        # green color [50, 100, 100], [70, 255, 255]
+        pink_lower_bound = [160,50,160]
+        pink_upper_bound = [180,255,255]
+        yellow_lower_bound = [25, 115, 120]
+        yellow_upper_bound = [90, 235, 255]
         
-        #Find convex hull
-        #hull = cv2.convexHull(cnts)
-    
-        #Find convex defects
-        #hull2 = cv2.convexHull(cnts,returnPoints = False)
-        #defects = cv2.convexityDefects(cnts,hull2)
-    
-        #Get defect points and draw them in the original image
-        #if defects is None:
-        #    continue
+        pink_cnts = get_contour(frame=frame, lower_bound=pink_lower_bound, upper_bound=pink_upper_bound)
+        yellow_cnts = get_contour(frame=frame, lower_bound=yellow_lower_bound, upper_bound=yellow_upper_bound)        
         
-        #FarDefect = []
-        # for i in range(defects.shape[0]):
-        #     s,e,f,d = defects[i,0]
-        #     start = tuple(cnts[s][0])
-        #     end = tuple(cnts[e][0])
-        #     far = tuple(cnts[f][0])
-        #     FarDefect.append(far)
-        #     cv2.line(frame,start,end,[0,255,0],1)
-        #     cv2.circle(frame,far,10,[100,255,255],3)
-    
-            #Find moments of the largest contour
-        moments = cv2.moments(cnts)
-    
-        #Central mass of first order moments
-        if moments['m00']!=0:
-            cx = int(moments['m10']/moments['m00']) # cx = M10/M00
-            cy = int(moments['m01']/moments['m00']) # cy = M01/M00
-        centerMass = (cx,cy)    
-    
-        #Draw center mass
-        cv2.circle(frame,centerMass,7,[100,0,255],2)
-        # font = cv2.FONT_HERSHEY_SIMPLEX
-        #cv2.putText(frame,'Center',tuple(centerMass),font,2,(255,255,255),2)     
-    
-        #Distance from each finger defect(finger webbing) to the center mass
-        # distanceBetweenDefectsToCenter = []
         
-        # for i in range(0,len(FarDefect)):
-        #     x =  np.array(FarDefect[i])
-        #     centerMass = np.array(centerMass)
-        #     distance = np.sqrt(np.power(x[0]-centerMass[0],2)+np.power(x[1]-centerMass[1],2))
-        #     distanceBetweenDefectsToCenter.append(distance)
-    
-        # #Get an average of three shortest distances from finger webbing to center mass
-        # sortedDefectsDistances = sorted(distanceBetweenDefectsToCenter)
-        # AverageDefectDistance = np.mean(sortedDefectsDistances[:2])
-    
-        # #Get fingertip points from contour hull
-        # #If points are in proximity of 80 pixels, consider as a single point in the group
-        # finger = []
-        # for i in range(0,len(hull)-1):
-        #     if (np.absolute(hull[i][0][0] - hull[i+1][0][0]) > 80) or ( np.absolute(hull[i][0][1] - hull[i+1][0][1]) > 80):
-        #         if hull[i][0][1] <500 :
-        #             finger.append(hull[i][0])
-    
-        # #The fingertip points are 5 hull points with largest y coordinates  
-        # finger =  sorted(finger,key=lambda x: x[1])   
-        # fingers = finger[0:5]
-    
-        # #Calculate distance of each finger tip to the center mass
-        # fingerDistance = []
-        # for i in range(0,len(fingers)):
-        #     distance = np.sqrt(np.power(fingers[i][0]-centerMass[0],2)+np.power(fingers[i][1]-centerMass[0],2))
-        #     fingerDistance.append(distance)
-    
-        # #Finger is pointed/raised if the distance of between fingertip to the center mass is larger
-        # #than the distance of average finger webbing to center mass by 130 pixels
-        # result = 0
-        # for i in range(0,len(fingers)):
-        #     if fingerDistance[i] > AverageDefectDistance+130:
-        #         result = result +1
-    
-        # #Print number of pointed fingers
-        # #cv2.putText(frame,str(result),(100,100),font,2,(255,255,255),2)
-    
-        # cv2.drawContours(frame,[hull],-1,(255,255,255),2)
-        
-        #circle
-        (x,y),radius = cv2.minEnclosingCircle(cnts)
-        center = (int(x),int(y))
-        radius = int(radius)
-        cv2.circle(frame,center,radius,(92, 66, 244),5)
-        
-        #fit line
-        #rows,cols = frame.shape[:2]
-        #[vx,vy,x,y] = cv2.fitLine(cnts, cv2.DIST_LABEL_PIXEL,0,0.01,0.01)
-        #lefty = int((-x*vy/vx) + y)
-        #righty = int(((cols-x)*vy/vx)+y)
-        #cv2.line(frame,(cols-1,righty),(0,lefty),(92, 66, 244),5)     
-        #print righty, lefty
-        #add fire
-        #fire_img.copyTo(frame, (x,y,fire_img.shape[0], fire_img.shape[1]))
-        #x = int(centerMass[0]) - fire_img.shape[0]/2
-        #y = int(centerMass[1]) - fire_img.shape[1]/2
-        #frame[y:y+fire_img.shape[0], x:x+fire_img.shape[1]] = fire_img
-        
-        #cv2.imshow('Gesture',frame)
+        pink_center_mass, pink_radius = augment_graph(frame=frame, contour=pink_cnts)
+        yellow_center_mass, yellow_radius = augment_graph(frame=frame, contour=yellow_cnts)
+        cv2.imshow('Gesture',frame)
         if gesture_call_back:
-            gesture_call_back(center=centerMass, contour=cnts)
+            gesture_call_back(pink_center_mass, pink_radius, yellow_center_mass, yellow_radius)
         #close the output video by pressing 'ESC'
-        k = cv2.waitKey(5) & 0xFF
+        k = cv2.waitKey(2) & 0xFF
         if k == 27:
             break
-    
     cap.release()
     cv2.destroyAllWindows()
 
@@ -235,48 +153,38 @@ def is_decreased_sequence(sequence):
             return False
     return True
 
-def click(x,y):
-    #gui.click()
-    pass
+def click():
+    gui.click()
     #print 'click'
 
 def double_click():
     pass
 
+def collision_detect(x1,y1,r1,x2,y2,r2):
+    return (x2-x1)**2 + (y1-y2)**2 <= (r1+r2)**2
+
 previous_center = None
 radius_queue = deque()
 slope_queue = deque()
 
-def gesture_call_back(center, contour):
+def gesture_call_back(pink_center, pink_radius, yellow_center, yellow_radius):
     global previous_center, radius_queue, slope_queue
     if previous_center is None:
-        previous_center = center
-    else:
+        previous_center = pink_center
+    elif pink_center is not None:
         old_x, old_y = previous_center
-        x, y = center
+        x, y = pink_center
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
 
-        if distance >= 200:
+        #if distance >= 200:
             #previous_center = center
             #return
-            print 'Scrolling'
         move(previous_center, x, y)
-        previous_center = center
+        previous_center = pink_center
         
-        # check click
-        #(x,y),radius = cv2.minEnclosingCircle(contour)
-        #if len(radius_queue) >= 10:
-            #radius_queue.popleft()
-        #radius_queue.append(radius)
-        
-        #if len(radius_queue) >= 10:
-            #slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(radius_queue)),list(radius_queue))
-            #if len(slope_queue) >= 10:
-                #slope_queue.popleft()
-            #slope_queue.append(slope)
-            #if len(slope_queue) >= 10 and is_decreased_sequence(list(slope_queue)):
-                #slope_queue.clear()
-                #click(x,y)
+    if pink_center and pink_radius and yellow_center and yellow_radius:
+        if collision_detect(pink_center[0], pink_center[1], pink_radius, yellow_center[0], yellow_center[1], yellow_radius):
+            click()
 
 def main():
     start_detect_hand(gesture_call_back=gesture_call_back)
