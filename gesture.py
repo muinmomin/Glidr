@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 import time
+
 import pyautogui as gui
+import pyautogui.tweens
 
 from collections import deque
 from scipy import stats
@@ -42,8 +44,8 @@ def start_detect_hand(gesture_call_back=None):
     cap = cv2.VideoCapture(0)
     #fire_img = cv2.imread('./fire.png')
     #Decrease frame size
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 1000)
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 600)    
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 1200)
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 800)    
     while(True):
     
         #Capture frames from the camera
@@ -110,25 +112,25 @@ def start_detect_hand(gesture_call_back=None):
         cnts = contours[ci]
         
         #Find convex hull
-        hull = cv2.convexHull(cnts)
+        #hull = cv2.convexHull(cnts)
     
         #Find convex defects
-        hull2 = cv2.convexHull(cnts,returnPoints = False)
-        defects = cv2.convexityDefects(cnts,hull2)
+        #hull2 = cv2.convexHull(cnts,returnPoints = False)
+        #defects = cv2.convexityDefects(cnts,hull2)
     
         #Get defect points and draw them in the original image
-        if defects is None:
-            continue
+        #if defects is None:
+        #    continue
         
-        FarDefect = []
-        for i in range(defects.shape[0]):
-            s,e,f,d = defects[i,0]
-            start = tuple(cnts[s][0])
-            end = tuple(cnts[e][0])
-            far = tuple(cnts[f][0])
-            FarDefect.append(far)
-            cv2.line(frame,start,end,[0,255,0],1)
-            cv2.circle(frame,far,10,[100,255,255],3)
+        #FarDefect = []
+        # for i in range(defects.shape[0]):
+        #     s,e,f,d = defects[i,0]
+        #     start = tuple(cnts[s][0])
+        #     end = tuple(cnts[e][0])
+        #     far = tuple(cnts[f][0])
+        #     FarDefect.append(far)
+        #     cv2.line(frame,start,end,[0,255,0],1)
+        #     cv2.circle(frame,far,10,[100,255,255],3)
     
             #Find moments of the largest contour
         moments = cv2.moments(cnts)
@@ -141,51 +143,51 @@ def start_detect_hand(gesture_call_back=None):
     
         #Draw center mass
         cv2.circle(frame,centerMass,7,[100,0,255],2)
-        font = cv2.FONT_HERSHEY_SIMPLEX
+        # font = cv2.FONT_HERSHEY_SIMPLEX
         #cv2.putText(frame,'Center',tuple(centerMass),font,2,(255,255,255),2)     
     
         #Distance from each finger defect(finger webbing) to the center mass
-        distanceBetweenDefectsToCenter = []
+        # distanceBetweenDefectsToCenter = []
         
-        for i in range(0,len(FarDefect)):
-            x =  np.array(FarDefect[i])
-            centerMass = np.array(centerMass)
-            distance = np.sqrt(np.power(x[0]-centerMass[0],2)+np.power(x[1]-centerMass[1],2))
-            distanceBetweenDefectsToCenter.append(distance)
+        # for i in range(0,len(FarDefect)):
+        #     x =  np.array(FarDefect[i])
+        #     centerMass = np.array(centerMass)
+        #     distance = np.sqrt(np.power(x[0]-centerMass[0],2)+np.power(x[1]-centerMass[1],2))
+        #     distanceBetweenDefectsToCenter.append(distance)
     
-        #Get an average of three shortest distances from finger webbing to center mass
-        sortedDefectsDistances = sorted(distanceBetweenDefectsToCenter)
-        AverageDefectDistance = np.mean(sortedDefectsDistances[:2])
+        # #Get an average of three shortest distances from finger webbing to center mass
+        # sortedDefectsDistances = sorted(distanceBetweenDefectsToCenter)
+        # AverageDefectDistance = np.mean(sortedDefectsDistances[:2])
     
-        #Get fingertip points from contour hull
-        #If points are in proximity of 80 pixels, consider as a single point in the group
-        finger = []
-        for i in range(0,len(hull)-1):
-            if (np.absolute(hull[i][0][0] - hull[i+1][0][0]) > 80) or ( np.absolute(hull[i][0][1] - hull[i+1][0][1]) > 80):
-                if hull[i][0][1] <500 :
-                    finger.append(hull[i][0])
+        # #Get fingertip points from contour hull
+        # #If points are in proximity of 80 pixels, consider as a single point in the group
+        # finger = []
+        # for i in range(0,len(hull)-1):
+        #     if (np.absolute(hull[i][0][0] - hull[i+1][0][0]) > 80) or ( np.absolute(hull[i][0][1] - hull[i+1][0][1]) > 80):
+        #         if hull[i][0][1] <500 :
+        #             finger.append(hull[i][0])
     
-        #The fingertip points are 5 hull points with largest y coordinates  
-        finger =  sorted(finger,key=lambda x: x[1])   
-        fingers = finger[0:5]
+        # #The fingertip points are 5 hull points with largest y coordinates  
+        # finger =  sorted(finger,key=lambda x: x[1])   
+        # fingers = finger[0:5]
     
-        #Calculate distance of each finger tip to the center mass
-        fingerDistance = []
-        for i in range(0,len(fingers)):
-            distance = np.sqrt(np.power(fingers[i][0]-centerMass[0],2)+np.power(fingers[i][1]-centerMass[0],2))
-            fingerDistance.append(distance)
+        # #Calculate distance of each finger tip to the center mass
+        # fingerDistance = []
+        # for i in range(0,len(fingers)):
+        #     distance = np.sqrt(np.power(fingers[i][0]-centerMass[0],2)+np.power(fingers[i][1]-centerMass[0],2))
+        #     fingerDistance.append(distance)
     
-        #Finger is pointed/raised if the distance of between fingertip to the center mass is larger
-        #than the distance of average finger webbing to center mass by 130 pixels
-        result = 0
-        for i in range(0,len(fingers)):
-            if fingerDistance[i] > AverageDefectDistance+130:
-                result = result +1
+        # #Finger is pointed/raised if the distance of between fingertip to the center mass is larger
+        # #than the distance of average finger webbing to center mass by 130 pixels
+        # result = 0
+        # for i in range(0,len(fingers)):
+        #     if fingerDistance[i] > AverageDefectDistance+130:
+        #         result = result +1
     
-        #Print number of pointed fingers
-        #cv2.putText(frame,str(result),(100,100),font,2,(255,255,255),2)
+        # #Print number of pointed fingers
+        # #cv2.putText(frame,str(result),(100,100),font,2,(255,255,255),2)
     
-        cv2.drawContours(frame,[hull],-1,(255,255,255),2)
+        # cv2.drawContours(frame,[hull],-1,(255,255,255),2)
         
         #circle
         (x,y),radius = cv2.minEnclosingCircle(cnts)
@@ -194,11 +196,11 @@ def start_detect_hand(gesture_call_back=None):
         cv2.circle(frame,center,radius,(92, 66, 244),5)
         
         #fit line
-        rows,cols = frame.shape[:2]
-        [vx,vy,x,y] = cv2.fitLine(cnts, cv2.DIST_LABEL_PIXEL,0,0.01,0.01)
-        lefty = int((-x*vy/vx) + y)
-        righty = int(((cols-x)*vy/vx)+y)
-        cv2.line(frame,(cols-1,righty),(0,lefty),(92, 66, 244),5)     
+        # rows,cols = frame.shape[:2]
+        # [vx,vy,x,y] = cv2.fitLine(cnts, cv2.DIST_LABEL_PIXEL,0,0.01,0.01)
+        # lefty = int((-x*vy/vx) + y)
+        # righty = int(((cols-x)*vy/vx)+y)
+        # cv2.line(frame,(cols-1,righty),(0,lefty),(92, 66, 244),5)     
         
         #add fire
         #fire_img.copyTo(frame, (x,y,fire_img.shape[0], fire_img.shape[1]))
@@ -210,7 +212,7 @@ def start_detect_hand(gesture_call_back=None):
         if gesture_call_back:
             gesture_call_back(center=centerMass, contour=cnts)
         #close the output video by pressing 'ESC'
-        k = cv2.waitKey(5) & 0xFF
+        k = cv2.waitKey(10) & 0xFF
         if k == 27:
             break
     
@@ -218,7 +220,7 @@ def start_detect_hand(gesture_call_back=None):
     cv2.destroyAllWindows()
 
 def move(previous_position, dx,dy):
-    gui.moveRel(dx, dy)
+    gui.moveRel(-dx, dy, 0.1, pyautogui.tweens.easeInOutQuad)
     pass
 
 def is_decreased_sequence(sequence):
