@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import time
 from collections import deque
+from scipy import stats
 # Function to find angle between two vectors
 def angle(v1,v2):
     dot = np.dot(v1,v2)
@@ -204,36 +205,34 @@ def start_detect_hand(gesture_call_back=None):
         if gesture_call_back:
             gesture_call_back(center=centerMass, contour=cnts)
         #close the output video by pressing 'ESC'
-        k = cv2.waitKey(15) & 0xFF
+        k = cv2.waitKey(20) & 0xFF
         if k == 27:
             break
     
     cap.release()
     cv2.destroyAllWindows()
 
-def move_left(x,y):
-    print 'Move left'
-
-def move_right(x,y):
-    print 'Move right'
-
-def move_up(x,y):
-    print 'Move up'
-
-def move_down(x,y):
-    print 'Move down'
-
-def click(radius):
+def move(previous_position, dx,dy):
     pass
+
+def is_decreased_sequence(sequence):
+    for i in xrange(1, len(sequence)):
+        if sequence[i] >= sequence[i-1]:
+            return False
+    return True
+
+def click(x,y):
+    print 'click'
 
 def double_click():
     pass
 
 previous_center = None
 radius_queue = deque()
+slope_queue = deque()
 
 def gesture_call_back(center, contour):
-    global previous_center
+    global previous_center, radius_queue, slope_queue
     if previous_center is None:
         previous_center = center
     else:
@@ -241,17 +240,25 @@ def gesture_call_back(center, contour):
         x, y = center
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
         if distance >= 200:
+            previous_center = center
             return
-        if old_x > x:
-            move_left(x, y)
-        if old_x <= x:
-            move_right(x, y)
-        if old_y > y:
-            move_up(x, y)
-        if old_y <= y:
-            move_down(x, y)
-        (x,y),radius = cv2.minEnclosingCircle(contour)
+        move(previous_center, x - old_x, y - old_y)
         previous_center = center
+        
+        # check click
+        (x,y),radius = cv2.minEnclosingCircle(contour)
+        if len(radius_queue) >= 7:
+            radius_queue.popleft()
+        radius_queue.append(radius)
+        
+        if len(radius_queue) >= 7:
+            slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(radius_queue)),list(radius_queue))
+            if len(slope_queue) >= 6:
+                slope_queue.popleft()
+            slope_queue.append(slope)
+            if len(slope_queue) >= 6 and is_decreased_sequence(list(slope_queue)):
+                slope_queue.clear()
+                click(x,y)
 
 def main():
     start_detect_hand(gesture_call_back=gesture_call_back)
