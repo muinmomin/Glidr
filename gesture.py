@@ -181,21 +181,22 @@ def gesture_call_back(pink_center, pink_radius, yellow_center, yellow_radius):
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
         if scroll_flag:
             if center_two_points is not None and scroll_center is not None:
-                #dx = scroll_center[0] - center_two_points[0]
-                #if dx >= 200: #if fingers are more than 200 away
-                    #if press_down: #and they have already been pressed
-                        #if switch_counter >= 5: #and it's been longer than 5 loops
-                            #gui.press('tab')
-                            #switch_counter = 0 #press and make counter 0
-                        #else:
-                            #switch_counter += 1
-                    #else: #if it hasn't been pressed
-                        #press_down = True
-                        #gui.keyDown("command")
-                        #gui.press('tab')
-                        #switch_counter += 1 #press and increment counter
-                #else:
-                gui.scroll((scroll_center[1] - center_two_points[1])) 
+                dx = scroll_center[0] - center_two_points[0]
+                if dx > 150: #if fingers are more than 200 away
+                    if press_down: #and they have already been pressed
+                        if switch_counter >= 5: #and it's been longer than 5 loops
+                            gui.press('tab')
+                            switch_counter = 0 #press and make counter 0
+                        else:
+                            switch_counter += 1
+                    else: #if it hasn't been pressed
+                        press_down = True
+                        gui.keyDown("command")
+                        gui.press("tab")
+                        switch_counter += 1 #press and increment counter
+                else:
+                    if abs(scroll_center[1] - center_two_points[1]) > 10:
+                        gui.scroll((scroll_center[1] - center_two_points[1])) 
                 #if (scroll_center[1] - center_two_points[1])/2 > 20:
                                        
                 #if dx <= -200:
@@ -212,7 +213,8 @@ def gesture_call_back(pink_center, pink_radius, yellow_center, yellow_radius):
                         #gui.press('tab')
                         #switch_counter += 1
                 #else:
-                    #gui.scroll(scroll_center[1] - center_two_points[1])
+                    #if abs(scroll_center[1] - center_two_points[1]) > 10:
+                        #gui.scroll((scroll_center[1] - center_two_points[1])) 
                     
         else:
             move(previous_center, x, y)
