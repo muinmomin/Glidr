@@ -1,8 +1,13 @@
 import cv2
 import numpy as np
 import time
+import pyautogui as gui
+
 from collections import deque
 # Function to find angle between two vectors
+
+mouseX, mouseY = 0, 0
+
 def angle(v1,v2):
     dot = np.dot(v1,v2)
     x_modulus = np.sqrt((v1*v1).sum())
@@ -204,24 +209,16 @@ def start_detect_hand(gesture_call_back=None):
         if gesture_call_back:
             gesture_call_back(center=centerMass, contour=cnts)
         #close the output video by pressing 'ESC'
-        k = cv2.waitKey(15) & 0xFF
+        k = cv2.waitKey(10) & 0xFF
         if k == 27:
             break
     
     cap.release()
     cv2.destroyAllWindows()
 
-def move_left(x,y):
-    print 'Move left'
-
-def move_right(x,y):
-    print 'Move right'
-
-def move_up(x,y):
-    print 'Move up'
-
-def move_down(x,y):
-    print 'Move down'
+def move(dx, dy):
+    gui.moveRel(-dx, dy)
+    pass
 
 def click(radius):
     pass
@@ -240,20 +237,19 @@ def gesture_call_back(center, contour):
         old_x, old_y = previous_center
         x, y = center
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
-        if distance >= 200:
-            return
-        if old_x > x:
-            move_left(x, y)
-        if old_x <= x:
-            move_right(x, y)
-        if old_y > y:
-            move_up(x, y)
-        if old_y <= y:
-            move_down(x, y)
+        
+        move(x - old_x, y - old_y)
+
         (x,y),radius = cv2.minEnclosingCircle(contour)
         previous_center = center
 
+def init_autogui():
+    global mouseX
+    global mouseY
+    mouseX, mouseY = gui.position()
+
 def main():
+    init_autogui()
     start_detect_hand(gesture_call_back=gesture_call_back)
     
 if __name__ == '__main__':
