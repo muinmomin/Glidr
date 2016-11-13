@@ -9,9 +9,6 @@ cap = cv2.VideoCapture(0)
 cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 1000)
 cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 600)
 
-def nothing(x):
-    pass
-
 # Function to find angle between two vectors
 def Angle(v1,v2):
     dot = np.dot(v1,v2)
@@ -37,17 +34,6 @@ def detect_face(image):
     )
     return faces if len(faces) else None
 
-# Creating a window for HSV track bars
-#cv2.namedWindow('HSV_TrackBar')
-
-# Starting with 100's to prevent error while masking
-#h,s,v = 100,100,100
-
-# Creating track bar
-#cv2.createTrackbar('h', 'HSV_TrackBar',0,179,nothing)
-#cv2.createTrackbar('s', 'HSV_TrackBar',0,255,nothing)
-#cv2.createTrackbar('v', 'HSV_TrackBar',0,255,nothing)
-
 def intersect(x_1, y_1, width_1, height_1, x_2, y_2, width_2, height_2):
     return not (x_1 > x_2+width_2 or x_1+width_1 < x_2 or y_1 > y_2+height_2 or y_1+height_1 < y_2)
 
@@ -57,12 +43,7 @@ while(True):
     #Capture frames from the camera
     ret, frame = cap.read()
     faces = detect_face(image=frame)
-    #cv2.imshow('Dilation',frame)
-    #k = cv2.waitKey(35) & 0xFF
-    #if k == 27:
-    #    break
-    #continue
-    #Blur the image
+
     blur = cv2.blur(frame,(3,3))
 
     #Convert to HSV color space
@@ -99,12 +80,11 @@ while(True):
     #Find Max contour area (Assume that hand is in the frame)
     if not len(contours):
         continue
-    max_area=100
+    max_area=5000
     ci=0
     for i in range(len(contours)):
         cnt=contours[i]
         area = cv2.contourArea(cnt)
-        #len(approx) >= 17 and
         if area > max_area:
             M = cv2.moments(cnt)
             cX = int(M["m10"] / M["m00"])
@@ -120,7 +100,7 @@ while(True):
             else:
                 max_area = area
                 ci = i
-        #Largest area contour 			  
+        #Largest area contour
     cnts = contours[ci]
     
     #Find convex hull
@@ -151,15 +131,16 @@ while(True):
     if moments['m00']!=0:
         cx = int(moments['m10']/moments['m00']) # cx = M10/M00
         cy = int(moments['m01']/moments['m00']) # cy = M01/M00
-    centerMass=(cx,cy)    
+    centerMass = (cx,cy)    
 
     #Draw center mass
     cv2.circle(frame,centerMass,7,[100,0,255],2)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(frame,'Center',tuple(centerMass),font,2,(255,255,255),2)     
+    #cv2.putText(frame,'Center',tuple(centerMass),font,2,(255,255,255),2)     
 
     #Distance from each finger defect(finger webbing) to the center mass
     distanceBetweenDefectsToCenter = []
+    
     for i in range(0,len(FarDefect)):
         x =  np.array(FarDefect[i])
         centerMass = np.array(centerMass)
@@ -168,7 +149,7 @@ while(True):
 
     #Get an average of three shortest distances from finger webbing to center mass
     sortedDefectsDistances = sorted(distanceBetweenDefectsToCenter)
-    AverageDefectDistance = np.mean(sortedDefectsDistances[0:2])
+    AverageDefectDistance = np.mean(sortedDefectsDistances[:2])
 
     #Get fingertip points from contour hull
     #If points are in proximity of 80 pixels, consider as a single point in the group
@@ -214,18 +195,13 @@ while(True):
 
     cv2.drawContours(frame,[hull],-1,(255,255,255),2)
 
-    ##### Show final image ########
     cv2.imshow('Dilation',frame)
-    ###############################
 
-    #Print execution time
-    #print time.time()-start_time
 
     #close the output video by pressing 'ESC'
-    k = cv2.waitKey(35) & 0xFF
+    k = cv2.waitKey(10) & 0xFF
     if k == 27:
         break
 
-print minimal, maximum, total/float(count)
 cap.release()
 cv2.destroyAllWindows()
