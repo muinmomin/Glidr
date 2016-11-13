@@ -4,6 +4,7 @@ import time
 import pyautogui as gui
 
 from collections import deque
+from scipy import stats
 # Function to find angle between two vectors
 
 mouseX, mouseY = 0, 0
@@ -209,39 +210,62 @@ def start_detect_hand(gesture_call_back=None):
         if gesture_call_back:
             gesture_call_back(center=centerMass, contour=cnts)
         #close the output video by pressing 'ESC'
-        k = cv2.waitKey(10) & 0xFF
+        k = cv2.waitKey(5) & 0xFF
         if k == 27:
             break
     
     cap.release()
     cv2.destroyAllWindows()
 
-def move(dx, dy):
-    gui.moveRel(-dx, dy)
+def move(previous_position, dx,dy):
+    gui.moveRel(dx, dy)
     pass
 
-def click(radius):
-    pass
+def is_decreased_sequence(sequence):
+    for i in xrange(1, len(sequence)):
+        if sequence[i] >= sequence[i-1]:
+            return False
+    return True
+
+def click(x,y):
+    gui.click()
 
 def double_click():
     pass
 
 previous_center = None
 radius_queue = deque()
+slope_queue = deque()
 
 def gesture_call_back(center, contour):
-    global previous_center
+    global previous_center, radius_queue, slope_queue
     if previous_center is None:
         previous_center = center
     else:
         old_x, old_y = previous_center
         x, y = center
         distance = np.sqrt(np.power(x-old_x,2)+np.power(y-old_y,2))
-        
-        move(x - old_x, y - old_y)
 
-        (x,y),radius = cv2.minEnclosingCircle(contour)
+        if distance >= 200:
+            previous_center = center
+            return
+        move(previous_center, x - old_x, y - old_y)
         previous_center = center
+        
+        # check click
+        (x,y),radius = cv2.minEnclosingCircle(contour)
+        if len(radius_queue) >= 7:
+            radius_queue.popleft()
+        radius_queue.append(radius)
+        
+        if len(radius_queue) >= 7:
+            slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(radius_queue)),list(radius_queue))
+            if len(slope_queue) >= 6:
+                slope_queue.popleft()
+            slope_queue.append(slope)
+            if len(slope_queue) >= 6 and is_decreased_sequence(list(slope_queue)):
+                slope_queue.clear()
+                click(x,y)
 
 def init_autogui():
     global mouseX
