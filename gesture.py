@@ -1,76 +1,3 @@
-"""
-import cv2
-import numpy as np
-import math
-cap = cv2.VideoCapture(0)
-while(cap.isOpened()):
-    ret, img = cap.read()
-    cv2.rectangle(img,(300,300),(100,100),(0,255,0),0)
-    crop_img = img[100:300, 100:300]
-    grey = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
-    value = (35, 35)
-    blurred = cv2.GaussianBlur(grey, value, 0)
-    _, thresh1 = cv2.threshold(blurred, 127, 255,
-                               cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
-    cv2.imshow('Thresholded', thresh1)
-
-    (version, _, _) = cv2.__version__.split('.')
-
-    if version is '3':
-        image, contours, hierarchy = cv2.findContours(thresh1.copy(), \
-               cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    elif version is '2':
-        contours, hierarchy = cv2.findContours(thresh1.copy(),cv2.RETR_TREE, \
-               cv2.CHAIN_APPROX_NONE)
-
-    cnt = max(contours, key = lambda x: cv2.contourArea(x))
-    
-    x,y,w,h = cv2.boundingRect(cnt)
-    cv2.rectangle(crop_img,(x,y),(x+w,y+h),(0,0,255),0)
-    hull = cv2.convexHull(cnt)
-    drawing = np.zeros(crop_img.shape,np.uint8)
-    cv2.drawContours(drawing,[cnt],0,(0,255,0),0)
-    cv2.drawContours(drawing,[hull],0,(0,0,255),0)
-    hull = cv2.convexHull(cnt,returnPoints = False)
-    defects = cv2.convexityDefects(cnt,hull)
-    count_defects = 0
-    cv2.drawContours(thresh1, contours, -1, (0,255,0), 3)
-    for i in range(defects.shape[0]):
-        s,e,f,d = defects[i,0]
-        start = tuple(cnt[s][0])
-        end = tuple(cnt[e][0])
-        far = tuple(cnt[f][0])
-        a = math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
-        b = math.sqrt((far[0] - start[0])**2 + (far[1] - start[1])**2)
-        c = math.sqrt((end[0] - far[0])**2 + (end[1] - far[1])**2)
-        angle = math.acos((b**2 + c**2 - a**2)/(2*b*c)) * 57
-        if angle <= 90:
-            count_defects += 1
-            cv2.circle(crop_img,far,1,[0,0,255],-1)
-        #dist = cv2.pointPolygonTest(cnt,far,True)
-        cv2.line(crop_img,start,end,[0,255,0],2)
-        #cv2.circle(crop_img,far,5,[0,0,255],-1)
-    if count_defects == 1:
-        cv2.putText(img,"I am Vipul", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, 2)
-    elif count_defects == 2:
-        str = "This is a basic hand gesture recognizer"
-        cv2.putText(img, str, (5,50), cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
-    elif count_defects == 3:
-        cv2.putText(img,"This is 4 :P", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, 2)
-    elif count_defects == 4:
-        cv2.putText(img,"Hi!!!", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, 2)
-    else:
-        cv2.putText(img,"Hello World!!!", (50,50),\
-                    cv2.FONT_HERSHEY_SIMPLEX, 2, 2)
-    #cv2.imshow('drawing', drawing)
-    #cv2.imshow('end', crop_img)
-    cv2.imshow('Gesture', img)
-    all_img = np.hstack((drawing, crop_img))
-    cv2.imshow('Contours', all_img)
-    k = cv2.waitKey(10)
-    if k == 27:
-        break
-"""
 import cv2
 import numpy as np
 import time
@@ -98,30 +25,47 @@ def Angle(v1,v2):
 def FindDistance(A,B): 
     return np.sqrt(np.power((A[0][0]-B[0][0]),2) + np.power((A[0][1]-B[0][1]),2)) 
 
+def detect_face(image):
+    faceCascade = cv2.CascadeClassifier('./haarcascade_frontalface_default.xml')
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = faceCascade.detectMultiScale(
+        gray,
+        scaleFactor=1.3,
+        minNeighbors=3,
+        minSize=(30, 30),
+        flags = cv2.cv.CV_HAAR_SCALE_IMAGE
+    )
+    return faces if len(faces) else None
 
 # Creating a window for HSV track bars
-cv2.namedWindow('HSV_TrackBar')
+#cv2.namedWindow('HSV_TrackBar')
 
 # Starting with 100's to prevent error while masking
-h,s,v = 100,100,100
+#h,s,v = 100,100,100
 
 # Creating track bar
-cv2.createTrackbar('h', 'HSV_TrackBar',0,179,nothing)
-cv2.createTrackbar('s', 'HSV_TrackBar',0,255,nothing)
-cv2.createTrackbar('v', 'HSV_TrackBar',0,255,nothing)
+#cv2.createTrackbar('h', 'HSV_TrackBar',0,179,nothing)
+#cv2.createTrackbar('s', 'HSV_TrackBar',0,255,nothing)
+#cv2.createTrackbar('v', 'HSV_TrackBar',0,255,nothing)
 
-while(1):
+def intersect(x_1, y_1, width_1, height_1, x_2, y_2, width_2, height_2):
+    return not (x_1 > x_2+width_2 or x_1+width_1 < x_2 or y_1 > y_2+height_2 or y_1+height_1 < y_2)
 
-    #Measure execution time 
-    start_time = time.time()
+
+while(True):
 
     #Capture frames from the camera
     ret, frame = cap.read()
-
+    faces = detect_face(image=frame)
+    #cv2.imshow('Dilation',frame)
+    #k = cv2.waitKey(35) & 0xFF
+    #if k == 27:
+    #    break
+    #continue
     #Blur the image
     blur = cv2.blur(frame,(3,3))
 
-        #Convert to HSV color space
+    #Convert to HSV color space
     hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
 
     #Create a binary image with where white will be skin colors and rest is black
@@ -150,21 +94,35 @@ while(1):
 
     #Draw Contours
     #cv2.drawContours(frame, cnt, -1, (122,122,0), 3)
-    #cv2.imshow('Dilation',median)
+    #cv2.imshow('temp',median)
 
-        #Find Max contour area (Assume that hand is in the frame)
+    #Find Max contour area (Assume that hand is in the frame)
+    if not len(contours):
+        continue
     max_area=100
-    ci=0	
+    ci=0
     for i in range(len(contours)):
         cnt=contours[i]
         area = cv2.contourArea(cnt)
-        if(area>max_area):
-            max_area=area
-            ci=i  
-
+        #len(approx) >= 17 and
+        if area > max_area:
+            M = cv2.moments(cnt)
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            if faces is not None and len(faces):
+                for (x,y,w,h) in faces:
+                    if x < cX < x + w and y < cY < y + h:
+                        continue
+                    else:
+                        max_area = area
+                        ci = i
+                        break
+            else:
+                max_area = area
+                ci = i
         #Largest area contour 			  
     cnts = contours[ci]
-
+    
     #Find convex hull
     hull = cv2.convexHull(cnts)
 
@@ -173,6 +131,9 @@ while(1):
     defects = cv2.convexityDefects(cnts,hull2)
 
     #Get defect points and draw them in the original image
+    if defects is None:
+        continue
+    
     FarDefect = []
     for i in range(defects.shape[0]):
         s,e,f,d = defects[i,0]
@@ -261,10 +222,10 @@ while(1):
     #print time.time()-start_time
 
     #close the output video by pressing 'ESC'
-    k = cv2.waitKey(5) & 0xFF
+    k = cv2.waitKey(35) & 0xFF
     if k == 27:
         break
 
-
+print minimal, maximum, total/float(count)
 cap.release()
 cv2.destroyAllWindows()
